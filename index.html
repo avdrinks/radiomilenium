@@ -72,18 +72,27 @@
         .program-info h2 { font-size: 1.1rem; color: white; margin-bottom: 2px; font-weight: 600; }
         .program-info p { font-size: 0.9rem; color: rgba(255,255,255,0.6); }
 
-        /* Contenedor del Reproductor */
+        /* Contenedor del Reproductor Oficial Integrado */
         .player-box { 
             background: var(--glass); 
             border: 1px solid var(--border); 
             border-radius: 24px; 
-            padding: 25px; 
+            padding: 20px; 
             backdrop-filter: blur(20px); 
             -webkit-backdrop-filter: blur(20px);
             margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 110px;
         }
-        .play-btn { width: 75px; height: 75px; border-radius: 50%; background: var(--magenta); border: none; color: white; font-size: 28px; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; }
-        .play-btn:hover { transform: scale(1.08); box-shadow: 0 0 30px var(--magenta); }
+        
+        /* Forzamos al reproductor nativo de Caster a verse centrado y prolijo */
+        #cstrFreePlayerDiv {
+            display: inline-block !important;
+            margin: 0 auto !important;
+        }
 
         /* Botones de enlace */
         .action-btns { display: flex; flex-direction: column; gap: 12px; width: 100%; }
@@ -94,9 +103,6 @@
         .btn:hover { transform: translateY(-2px); opacity: 0.95; }
         
         footer { margin-top: auto; padding: 20px; font-size: 0.75rem; color: rgba(255,255,255,0.3); }
-
-        /* Ocultamos el widget visual de Caster para usar el nuestro premium */
-        #caster-hidden-wrapper { display: none !important; }
     </style>
 </head>
 <body>
@@ -119,8 +125,16 @@
         </div>
 
         <div class="player-box">
-            <button class="play-btn" id="playBtn"><i class="fas fa-play"></i></button>
-            <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.5; letter-spacing: 1px;">REPRODUCTOR OFICIAL</p>
+            <p style="font-size: 0.75rem; opacity: 0.5; letter-spacing: 1px; margin-bottom: 12px;">REPRODUCTOR EN VIVO</p>
+            
+            <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
+            <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
+            <div id="cstrFreePlayerDiv"></div>
+            
+            <div style="height: 0px; width: 0px; overflow: hidden; opacity: 0;">
+                <a id="cstrFreePlayerBL1" href="https://www.caster.fm/">Free Shoutcast Hosting</a>
+                <a id="cstrFreePlayerBL2" href="https://www.caster.fm/">Radio Stream Hosting</a>
+            </div>
         </div>
 
         <div class="action-btns">
@@ -134,29 +148,16 @@
         &copy; 2026 FM Milenium 102.3 | San Martín, Mendoza, Argentina.
     </footer>
 
-    <div id="caster-hidden-wrapper">
-        <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
-        <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
-        <a id="cstrFreePlayerBL1" href="https://www.caster.fm/">Free Shoutcast Hosting</a>
-        <a id="cstrFreePlayerBL2" href="https://www.caster.fm/">Radio Stream Hosting</a>
-        <div id="cstrFreePlayerDiv"></div>
-    </div>
-
     <script>
         // Enlace de tu Google Sheets en formato CSV
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTuFgP5EhuP-TwX7XDpXJXSrk4oxmOc0IS9a1Yx5ypO2nN2_UOrEfN3jiHCJoW03wbHYCbblUELLcUx/pub?output=csv";
 
         let listaProgramas = [];
-        letisPlaying = false;
 
         // RELOJ CON HUSO HORARIO FIJO DE ARGENTINA
         function updateArgentinaTime() {
             const now = new Date();
             
-            const optionsTime = { timeZone: 'America/America/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-            const optionsDate = { timeZone: 'America/America/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' };
-            
-            // Forzar fallback si falla la TimeZone exacta en dispositivos viejos
             let argTimeStr, argDateStr;
             try {
                 argTimeStr = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -233,38 +234,6 @@
                 document.getElementById('prog-logo').src = "logo.png"; 
             }
         }
-
-        // CONTROL REMOTO DEL REPRODUCTOR INVISIBLE DE CASTER
-        const btn = document.getElementById('playBtn');
-        
-        btn.onclick = () => {
-            // Intentamos buscar el elemento de audio interno que genera el script de Caster
-            const casterAudio = document.querySelector('#caster-hidden-wrapper audio') || document.querySelector('#cstrFreePlayerDiv audio');
-            
-            if (casterAudio) {
-                if (!isPlaying) {
-                    casterAudio.play().then(() => {
-                        isPlaying = true;
-                        btn.innerHTML = '<i class="fas fa-pause"></i>';
-                    }).catch(err => console.error("Error al reproducir Caster:", err));
-                } else {
-                    casterAudio.pause();
-                    isPlaying = false;
-                    btn.innerHTML = '<i class="fas fa-play"></i>';
-                }
-            } else {
-                // Si el script de Caster usa un botón de Flash/iframe antiguo, simulamos el clic en su propio botón
-                const casterPlayBtn = document.querySelector('#cstrFreePlayerDiv img') || document.querySelector('#cstrFreePlayerDiv button');
-                if (casterPlayBtn) {
-                    casterPlayBtn.click();
-                    isPlaying = !isPlaying;
-                    btn.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
-                } else {
-                    alert("Iniciando conexión con el servidor de Caster.fm... Dale play nuevamente en 2 segundos.");
-                    location.reload();
-                }
-            }
-        };
 
         loadExcelData();
     </script>
