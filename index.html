@@ -72,7 +72,7 @@
         .program-info h2 { font-size: 1.1rem; color: white; margin-bottom: 2px; font-weight: 600; }
         .program-info p { font-size: 0.9rem; color: rgba(255,255,255,0.6); }
 
-        /* Contenedor del Reproductor Customizado */
+        /* Contenedor del Reproductor Premium */
         .player-box { 
             background: var(--glass); 
             border: 1px solid var(--border); 
@@ -81,57 +81,42 @@
             backdrop-filter: blur(20px); 
             -webkit-backdrop-filter: blur(20px);
             margin-bottom: 25px;
-            position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
         }
 
-        /* CAPA GHOST: Estiramos el widget de Caster y lo hacemos invisible al ojo */
-        .caster-overlay-container {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10;
-            opacity: 0.01; /* Es invisible pero capta los clics reales */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        #cstrFreePlayerDiv {
-            transform: scale(3); /* Lo agrandamos para que ocupe todo el espacio de clic */
-        }
-
-        /* FACHADA PREMIUM: Lo que realmente ve el usuario */
+        /* Botón de Play Interactiva con Neón */
         .custom-play-btn {
-            width: 80px;
-            height: 80px;
+            width: 85px;
+            height: 85px;
             border-radius: 50%;
             background: var(--magenta);
             color: white;
-            font-size: 30px;
+            font-size: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: none;
             box-shadow: 0 0 25px rgba(255, 0, 127, 0.4);
-            pointer-events: none; /* Deja pasar el clic al fondo */
-            transition: 0.3s ease;
-            z-index: 5;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .custom-play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 35px rgba(255, 0, 127, 0.7);
         }
         
-        /* Animación de ondas cuando está sonando */
+        /* Ondas de Sonido */
         .audio-wave {
             display: flex;
             align-items: flex-end;
             gap: 4px;
-            height: 20px;
-            margin-top: 15px;
+            height: 22px;
+            margin-top: 20px;
             opacity: 0;
             transition: 0.3s;
-            z-index: 5;
         }
         .audio-wave span {
             width: 3px;
@@ -140,7 +125,7 @@
             border-radius: 2px;
         }
         
-        /* Estado ACTIVO controlado por JavaScript */
+        /* Estados Activos controlados por JS */
         .playing .custom-play-btn {
             background: white;
             color: var(--dark);
@@ -181,30 +166,23 @@
         <div class="live-program-card">
             <img src="logo.png" class="program-logo" id="prog-logo">
             <div class="program-info">
-                <p style="font-size: 0.7rem; letter-spacing: 1px; color: var(--magenta); font-weight: bold; margin-bottom: 3px;">● EN VIVO DESDE ARGENTINA</p>
+                <p style="font-size: 0.7rem; letter-spacing: 1px; color: var(--magenta); font-weight: bold; margin-bottom: 3px;">● EN VIVO</p>
                 <h2 id="prog-name">Conectando...</h2>
                 <p id="prog-host">Cargando programación en vivo</p>
             </div>
         </div>
 
         <div class="player-box" id="playerMaster">
+            <audio id="audioStream" src="http://s2.free-shoutcast.com:18208/;" preload="none"></audio>
             
-            <button class="custom-play-btn" id="fakePlayBtn"><i class="fas fa-play" id="fakeIcon"></i></button>
+            <button class="custom-play-btn" id="playBtn" onclick="toggleRadio()">
+                <i class="fas fa-play" id="playIcon"></i>
+            </button>
             
             <div class="audio-wave">
                 <span></span><span></span><span></span><span></span>
             </div>
-
-            <div class="caster-overlay-container">
-                <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
-                <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
-                <div id="cstrFreePlayerDiv"></div>
-            </div>
-            
-            <div style="height: 0px; width: 0px; overflow: hidden; opacity: 0;">
-                <a id="cstrFreePlayerBL1" href="https://www.caster.fm/">Free Shoutcast Hosting</a>
-                <a id="cstrFreePlayerBL2" href="https://www.caster.fm/">Radio Stream Hosting</a>
-            </div>
+            <p id="playerStatus" style="font-size: 0.75rem; opacity: 0.5; margin-top: 12px; letter-spacing: 1px; text-transform: uppercase;">ESCUCHAR EN VIVO</p>
         </div>
 
         <div class="action-btns">
@@ -221,25 +199,32 @@
     <script>
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTuFgP5EhuP-TwX7XDpXJXSrk4oxmOc0IS9a1Yx5ypO2nN2_UOrEfN3jiHCJoW03wbHYCbblUELLcUx/pub?output=csv";
         let listaProgramas = [];
-        let isRadioPlaying = false;
-
-        // ANIMACIÓN INTERACTIVA AL HACER CLIC
+        
+        const audioStream = document.getElementById('audioStream');
+        const playIcon = document.getElementById('playIcon');
         const playerMaster = document.getElementById('playerMaster');
-        const fakeIcon = document.getElementById('fakeIcon');
+        const playerStatus = document.getElementById('playerStatus');
 
-        playerMaster.addEventListener('click', () => {
-            // Le damos una pausa mínima para sincronizar el cambio visual al tocar el área
-            setTimeout(() => {
-                isRadioPlaying = !isRadioPlaying;
-                if(isRadioPlaying) {
-                    playerMaster.classList.add('playing');
-                    fakeIcon.className = "fas fa-pause";
-                } else {
-                    playerMaster.classList.remove('playing');
-                    fakeIcon.className = "fas fa-play";
-                }
-            }, 150);
-        });
+        function toggleRadio() {
+            if (audioStream.paused) {
+                audioStream.load(); 
+                audioStream.play()
+                    .then(() => {
+                        playerMaster.classList.add('playing');
+                        playIcon.className = "fas fa-pause";
+                        playerStatus.innerText = "Transmitiendo...";
+                    })
+                    .catch(err => {
+                        console.error("Error al reproducir Shoutcast:", err);
+                        playerStatus.innerText = "Error de conexión";
+                    });
+            } else {
+                audioStream.pause();
+                playerMaster.classList.remove('playing');
+                playIcon.className = "fas fa-play";
+                playerStatus.innerText = "Al aire pausado";
+            }
+        }
 
         // RELOJ CON HUSO HORARIO DE ARGENTINA
         function updateArgentinaTime() {
@@ -266,7 +251,6 @@
             }
         }
 
-        // LEER LOS DATOS DEL EXCEL
         async function loadExcelData() {
             try {
                 const response = await fetch(SHEET_CSV_URL);
