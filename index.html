@@ -94,6 +94,9 @@
         .btn:hover { transform: translateY(-2px); opacity: 0.95; }
         
         footer { margin-top: auto; padding: 20px; font-size: 0.75rem; color: rgba(255,255,255,0.3); }
+
+        /* Ocultamos el widget visual de Caster para usar el nuestro premium */
+        #caster-hidden-wrapper { display: none !important; }
     </style>
 </head>
 <body>
@@ -117,11 +120,7 @@
 
         <div class="player-box">
             <button class="play-btn" id="playBtn"><i class="fas fa-play"></i></button>
-            <div style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <i class="fas fa-volume-down" style="font-size: 0.8rem; opacity: 0.5;"></i>
-                <input type="range" id="vol" min="0" max="1" step="0.05" value="0.8" style="accent-color: var(--magenta); width: 120px;">
-                <i class="fas fa-volume-up" style="font-size: 0.8rem; opacity: 0.5;"></i>
-            </div>
+            <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.5; letter-spacing: 1px;">REPRODUCTOR OFICIAL</p>
         </div>
 
         <div class="action-btns">
@@ -135,29 +134,49 @@
         &copy; 2026 FM Milenium 102.3 | San Martín, Mendoza, Argentina.
     </footer>
 
-    <audio id="stream" src="https://shoutcast.caster.fm:37060/listen.mp3"></audio>
+    <div id="caster-hidden-wrapper">
+        <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
+        <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
+        <a id="cstrFreePlayerBL1" href="https://www.caster.fm/">Free Shoutcast Hosting</a>
+        <a id="cstrFreePlayerBL2" href="https://www.caster.fm/">Radio Stream Hosting</a>
+        <div id="cstrFreePlayerDiv"></div>
+    </div>
 
     <script>
         // Enlace de tu Google Sheets en formato CSV
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTuFgP5EhuP-TwX7XDpXJXSrk4oxmOc0IS9a1Yx5ypO2nN2_UOrEfN3jiHCJoW03wbHYCbblUELLcUx/pub?output=csv";
 
         let listaProgramas = [];
+        letisPlaying = false;
 
         // RELOJ CON HUSO HORARIO FIJO DE ARGENTINA
         function updateArgentinaTime() {
             const now = new Date();
             
-            const optionsTime = { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-            const optionsDate = { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' };
+            const optionsTime = { timeZone: 'America/America/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const optionsDate = { timeZone: 'America/America/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' };
             
-            const argTimeStr = now.toLocaleTimeString('es-AR', optionsTime);
-            const argDateStr = now.toLocaleDateString('es-AR', optionsDate);
+            // Forzar fallback si falla la TimeZone exacta en dispositivos viejos
+            let argTimeStr, argDateStr;
+            try {
+                argTimeStr = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                argDateStr = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
+            } catch(e) {
+                argTimeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                argDateStr = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+            }
 
             document.getElementById('digital-clock').innerText = argTimeStr;
             document.getElementById('current-date').innerText = argDateStr;
 
             const [hora, minutos] = argTimeStr.split(':').map(Number);
-            const argDateObj = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+            
+            let argDateObj;
+            try {
+                argDateObj = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+            } catch(e) {
+                argDateObj = now;
+            }
             const diaSemanaArg = argDateObj.getDay(); 
 
             if(listaProgramas.length > 0) {
@@ -195,8 +214,8 @@
         }
 
         // COMPROBACIÓN DE HORARIO EN VIVO
-        function checkLiveSchedule(hora, minutos, dia) {
-            const horaActualStr = `${String(hora).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+        function checkLiveSchedule(hora, minutes, dia) {
+            const horaActualStr = `${String(hora).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
             const enVivo = listaProgramas.find(p => {
                 const coincideDia = p.dias.includes(dia);
@@ -215,22 +234,36 @@
             }
         }
 
-        // CONTROLES DEL REPRODUCTOR
-        const audio = document.getElementById('stream');
+        // CONTROL REMOTO DEL REPRODUCTOR INVISIBLE DE CASTER
         const btn = document.getElementById('playBtn');
         
         btn.onclick = () => {
-            if (audio.paused) { 
-                audio.play(); 
-                btn.innerHTML = '<i class="fas fa-pause"></i>'; 
-            } else { 
-                audio.pause(); 
-                btn.innerHTML = '<i class="fas fa-play"></i>'; 
+            // Intentamos buscar el elemento de audio interno que genera el script de Caster
+            const casterAudio = document.querySelector('#caster-hidden-wrapper audio') || document.querySelector('#cstrFreePlayerDiv audio');
+            
+            if (casterAudio) {
+                if (!isPlaying) {
+                    casterAudio.play().then(() => {
+                        isPlaying = true;
+                        btn.innerHTML = '<i class="fas fa-pause"></i>';
+                    }).catch(err => console.error("Error al reproducir Caster:", err));
+                } else {
+                    casterAudio.pause();
+                    isPlaying = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            } else {
+                // Si el script de Caster usa un botón de Flash/iframe antiguo, simulamos el clic en su propio botón
+                const casterPlayBtn = document.querySelector('#cstrFreePlayerDiv img') || document.querySelector('#cstrFreePlayerDiv button');
+                if (casterPlayBtn) {
+                    casterPlayBtn.click();
+                    isPlaying = !isPlaying;
+                    btn.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+                } else {
+                    alert("Iniciando conexión con el servidor de Caster.fm... Dale play nuevamente en 2 segundos.");
+                    location.reload();
+                }
             }
-        };
-        
-        document.getElementById('vol').oninput = (e) => {
-            audio.volume = e.target.value;
         };
 
         loadExcelData();
