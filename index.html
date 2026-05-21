@@ -72,26 +72,89 @@
         .program-info h2 { font-size: 1.1rem; color: white; margin-bottom: 2px; font-weight: 600; }
         .program-info p { font-size: 0.9rem; color: rgba(255,255,255,0.6); }
 
-        /* Contenedor del Reproductor Oficial Integrado */
+        /* Contenedor del Reproductor Customizado */
         .player-box { 
             background: var(--glass); 
             border: 1px solid var(--border); 
             border-radius: 24px; 
-            padding: 20px; 
+            padding: 30px 20px; 
             backdrop-filter: blur(20px); 
             -webkit-backdrop-filter: blur(20px);
             margin-bottom: 25px;
+            position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 110px;
+            overflow: hidden;
+        }
+
+        /* CAPA GHOST: Estiramos el widget de Caster y lo hacemos invisible al ojo */
+        .caster-overlay-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            opacity: 0.01; /* Es invisible pero capta los clics reales */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        #cstrFreePlayerDiv {
+            transform: scale(3); /* Lo agrandamos para que ocupe todo el espacio de clic */
+        }
+
+        /* FACHADA PREMIUM: Lo que realmente ve el usuario */
+        .custom-play-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--magenta);
+            color: white;
+            font-size: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.4);
+            pointer-events: none; /* Deja pasar el clic al fondo */
+            transition: 0.3s ease;
+            z-index: 5;
         }
         
-        /* Forzamos al reproductor nativo de Caster a verse centrado y prolijo */
-        #cstrFreePlayerDiv {
-            display: inline-block !important;
-            margin: 0 auto !important;
+        /* Animación de ondas cuando está sonando */
+        .audio-wave {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 20px;
+            margin-top: 15px;
+            opacity: 0;
+            transition: 0.3s;
+            z-index: 5;
+        }
+        .audio-wave span {
+            width: 3px;
+            height: 100%;
+            background: var(--magenta);
+            border-radius: 2px;
+        }
+        
+        /* Estado ACTIVO controlado por JavaScript */
+        .playing .custom-play-btn {
+            background: white;
+            color: var(--dark);
+            box-shadow: 0 0 35px rgba(255, 255, 255, 0.5);
+        }
+        .playing .audio-wave { opacity: 1; }
+        .playing .audio-wave span { animation: bounce 0.8s infinite alternate; }
+        .playing .audio-wave span:nth-child(2) { animation-delay: 0.2s; }
+        .playing .audio-wave span:nth-child(3) { animation-delay: 0.4s; }
+        .playing .audio-wave span:nth-child(4) { animation-delay: 0.1s; }
+
+        @keyframes bounce {
+            0% { height: 4px; }
+            100% { height: 22px; }
         }
 
         /* Botones de enlace */
@@ -124,12 +187,19 @@
             </div>
         </div>
 
-        <div class="player-box">
-            <p style="font-size: 0.75rem; opacity: 0.5; letter-spacing: 1px; margin-bottom: 12px;">REPRODUCTOR EN VIVO</p>
+        <div class="player-box" id="playerMaster">
             
-            <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
-            <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
-            <div id="cstrFreePlayerDiv"></div>
+            <button class="custom-play-btn" id="fakePlayBtn"><i class="fas fa-play" id="fakeIcon"></i></button>
+            
+            <div class="audio-wave">
+                <span></span><span></span><span></span><span></span>
+            </div>
+
+            <div class="caster-overlay-container">
+                <script type="text/javascript">var cstrFreePlayerUid = 548858;var cstrFreePlayerTheme = "purple";var cstrFreePlayerColor = "";</script>
+                <script type="text/javascript" src="https://corscdn.caster.fm/freeplayer/FreePlanPlayerEmbed.js"></script>
+                <div id="cstrFreePlayerDiv"></div>
+            </div>
             
             <div style="height: 0px; width: 0px; overflow: hidden; opacity: 0;">
                 <a id="cstrFreePlayerBL1" href="https://www.caster.fm/">Free Shoutcast Hosting</a>
@@ -149,15 +219,31 @@
     </footer>
 
     <script>
-        // Enlace de tu Google Sheets en formato CSV
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTuFgP5EhuP-TwX7XDpXJXSrk4oxmOc0IS9a1Yx5ypO2nN2_UOrEfN3jiHCJoW03wbHYCbblUELLcUx/pub?output=csv";
-
         let listaProgramas = [];
+        let isRadioPlaying = false;
 
-        // RELOJ CON HUSO HORARIO FIJO DE ARGENTINA
+        // ANIMACIÓN INTERACTIVA AL HACER CLIC
+        const playerMaster = document.getElementById('playerMaster');
+        const fakeIcon = document.getElementById('fakeIcon');
+
+        playerMaster.addEventListener('click', () => {
+            // Le damos una pausa mínima para sincronizar el cambio visual al tocar el área
+            setTimeout(() => {
+                isRadioPlaying = !isRadioPlaying;
+                if(isRadioPlaying) {
+                    playerMaster.classList.add('playing');
+                    fakeIcon.className = "fas fa-pause";
+                } else {
+                    playerMaster.classList.remove('playing');
+                    fakeIcon.className = "fas fa-play";
+                }
+            }, 150);
+        });
+
+        // RELOJ CON HUSO HORARIO DE ARGENTINA
         function updateArgentinaTime() {
             const now = new Date();
-            
             let argTimeStr, argDateStr;
             try {
                 argTimeStr = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -171,13 +257,8 @@
             document.getElementById('current-date').innerText = argDateStr;
 
             const [hora, minutos] = argTimeStr.split(':').map(Number);
-            
             let argDateObj;
-            try {
-                argDateObj = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
-            } catch(e) {
-                argDateObj = now;
-            }
+            try { argDateObj = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })); } catch(e) { argDateObj = now; }
             const diaSemanaArg = argDateObj.getDay(); 
 
             if(listaProgramas.length > 0) {
@@ -185,7 +266,7 @@
             }
         }
 
-        // CONECTAR Y LEER LOS DATOS DEL EXCEL
+        // LEER LOS DATOS DEL EXCEL
         async function loadExcelData() {
             try {
                 const response = await fetch(SHEET_CSV_URL);
@@ -214,15 +295,9 @@
             }
         }
 
-        // COMPROBACIÓN DE HORARIO EN VIVO
         function checkLiveSchedule(hora, minutes, dia) {
             const horaActualStr = `${String(hora).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-            const enVivo = listaProgramas.find(p => {
-                const coincideDia = p.dias.includes(dia);
-                const coincideHora = horaActualStr >= p.inicio && horaActualStr < p.fin;
-                return coincideDia && coincideHora;
-            });
+            const enVivo = listaProgramas.find(p => p.dias.includes(dia) && horaActualStr >= p.inicio && horaActualStr < p.fin);
 
             if (enVivo) {
                 document.getElementById('prog-name').innerText = enVivo.nombre;
